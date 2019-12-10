@@ -1,19 +1,18 @@
-FROM mcr.microsoft.com/dotnet/core/aspnet:3.0-buster-slim AS base
+FROM mcr.microsoft.com/dotnet/core/sdk:3.1 AS build
 WORKDIR /app
-EXPOSE 80
 
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0-buster AS build
-WORKDIR /src
-COPY ["SampleDocker/SampleDocker.csproj", "SampleDocker/"]
-RUN dotnet restore "SampleDocker/SampleDocker.csproj"
-COPY . .
-WORKDIR "/src/SampleDocker"
-RUN dotnet build "SampleDocker.csproj" -c Release -o /app/build
+# copy csproj and restore as distinct layers
+COPY *.sln .
+COPY sampledocker/*.csproj ./sampledocker/
+RUN dotnet restore
 
-FROM build AS publish
-RUN dotnet publish "SampleDocker.csproj" -c Release -o /app/publish
+# copy everything else and build app
+COPY sampledocker/. ./sampledocker/
+WORKDIR /app/sampledocker
+RUN dotnet publish -c Release -o out
 
-FROM base AS final
+
+FROM mcr.microsoft.com/dotnet/core/aspnet:3.1 AS runtime
 WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "SampleDocker.dll"]
+COPY --from=build /app/sampledocker/out ./
+ENTRYPOINT ["dotnet", "sampledocker.dll"]
